@@ -1,0 +1,45 @@
+services:
+  zipkin:
+    image: openzipkin/zipkin:latest
+    restart: always
+    ports:
+      - "9411:9411"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"] 
+    volumes:
+      - ./.docker/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+  
+  goapp-b:
+    container_name: goapp-b
+    hostname: goapp-b
+    build:
+      context: ./Service-B
+      dockerfile: Dockerfile
+    environment:
+      - OTEL_SERVICE_NAME=service-b
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - REQUEST_NAME_OTEL=service-a-request
+    ports:
+      - '8083:8083'
+    depends_on:
+      - zipkin
+      - otel-collector
+
+  goapp-a:
+    container_name: goapp-a
+    hostname: goapp-a
+    build:
+      context: ./Service-A
+      dockerfile: Dockerfile
+    environment:
+      - OTEL_SERVICE_NAME=service-a
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - REQUEST_NAME_OTEL=service-a-request
+    ports:
+      - '8082:8082'
+    depends_on:
+      - zipkin
+      - otel-collector
