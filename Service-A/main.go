@@ -68,6 +68,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	response, err := requestServiceB(ctx, cepInput.Cep)
 	if err != nil {
+		if err.Error() == "404 Not Found" {
+			http.Error(w, "cannot find zipcode", http.StatusNotFound)
+			return
+		}
+
 		http.Error(w, "external error - service B", http.StatusBadRequest)
 		return
 	}
@@ -87,11 +92,16 @@ func requestServiceB(ctx context.Context, cep string) (*ResponseWeather, error) 
 	span.End()
 
 	url := fmt.Sprintf("http://goapp-b:8083?cep=%s", cep)
+
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf(res.Status)
+	}
 
 	var result *ResponseWeather
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
